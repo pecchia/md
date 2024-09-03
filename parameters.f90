@@ -3,9 +3,9 @@ module parameters
  implicit none
 
  integer :: Natoms       ! Number of atoms 
- integer :: Nx, Ny, Nz   ! Number of atoms in each direction
- real(dp) :: Lx, Ly, Lz  ! Box sizes  [nm]
- real(dp) :: Vol
+ integer :: Nx, Ny       ! Number of atoms in each direction
+ real(dp) :: Lx, Ly      ! Box sizes  [nm]
+ real(dp) :: Area
  real(dp) :: Rc          ! Cutoff radius [nm]
  real(dp) :: Temp        ! Temperature [K]
  real(dp) :: tinit       ! initialization time [fs]
@@ -27,13 +27,17 @@ module parameters
 
  real(dp):: Q=5.0_dp     ! Nose-Hoover mass
  
- logical :: scaling=.false.    ! velocity rescaling
+ logical :: scaling=.false.     ! velocity rescaling
  logical :: nose_hoover=.false. ! nose-hoover thermostat
- logical :: print_xyz=.false.  ! if xyz should be printed
- integer :: print_interval=1   ! xyz print interval
+ logical :: print_xyz=.false.   ! if xyz should be printed
+ integer :: print_interval=1    ! xyz print interval
 
- ! Stuff for Lyapunov
- real(dp) :: LJTU
+
+ character(50) :: file_name
+
+
+! Stuff for Lyapunov
+ real(dp) :: LJTU = 1.0_dp
  logical :: Dtemp
  logical :: shnn
  logical :: do_lyapunov
@@ -46,7 +50,7 @@ module parameters
 
   type(TLyapunovEnum), parameter, public :: LyapunovAlgorithm = TLyapunovEnum()
  
- integer :: algorithm = LyapunovAlgorithm%volumes
+ integer :: algorithm = LyapunovAlgorithm%QR
 
  real(dp) :: Tempf
  real(dp) :: tsh
@@ -64,14 +68,14 @@ module parameters
 
  subroutine create_xv() !agg
    integer :: err
-   allocate(x(3,Natoms),stat=err)
-   allocate(v(3,Natoms),stat=err)
+   allocate(x(2,Natoms),stat=err)
+   allocate(v(2,Natoms),stat=err)
    if (err /= 0) STOP 'ALLOCATION ERROR x or v or eta'
  end subroutine create_xv
 
  subroutine create_eta() !agg
    integer :: err
-   allocate(eta(3,Natoms,5), stat=err)
+   allocate(eta(2,Natoms,5), stat=err)
    if (err /= 0) STOP 'ALLOCATION ERROR x or v or eta'
  end subroutine create_eta
 
@@ -86,8 +90,8 @@ module parameters
 
  subroutine create_xvly() !agg
    integer :: err
-   allocate(dx(3,Natoms,6*Natoms),stat=err)
-   allocate(dv(3,Natoms,6*Natoms),stat=err)
+   allocate(dx(2,Natoms,4*Natoms),stat=err)
+   allocate(dv(2,Natoms,4*Natoms),stat=err)
    if (err /= 0) STOP 'ALLOCATION ERROR xl or vl or etal'
  end subroutine create_xvly
 
@@ -104,11 +108,7 @@ module parameters
      ! [M2F] = eV * (fs/nm)^2
    
      Mass = Mass * M2F
-
-     Vol = Lx*Ly*Lz
-
-     
-
+     Area = Lx*Ly
  end subroutine transform_units
 
 

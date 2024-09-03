@@ -14,72 +14,77 @@ module simulations
 
   public :: transform_units
   public :: init_positions_fcc
+  public :: init_positions_rnd
   public :: init_velocities
-  public :: init_lyapunov
+  public :: init_velocities_rnd
+  public :: init_positions_file
+  public :: init_velocities_couette
   public :: init_seed
   public :: nve_sim
   public :: write_coords
   public :: compute_g
+  public :: init_lyapunov
   
 
   contains
+
+  subroutine init_positions_rnd()
+    integer :: i, ii, jj
+    call random_number(x(1,:))
+    x(1,:) = x(1,:)*Lx
+    call random_number(x(2,:))
+    x(2,:) = x(2,:)*Ly
+
+    do i = 1, Natoms
+       call boxind(x(:,i),ii,jj)
+       call add(boxlists(ii,jj),i)
+    end do 
+  end subroutine init_positions_rnd
+
+  subroutine init_velocities_rnd()
+ 
+    call random_number(v(1,:))
+    call random_number(v(2,:)) 
+
+  end subroutine init_velocities_rnd
 
   ! ---------------------------------------------------------
   ! Initialize positions of particles as in fcc lattice
   subroutine init_positions_fcc()
     integer :: i,err
-    real(dp) :: rndr, ax, ay, az, aa(3)
-    real(dp) :: bb(3,4)
-    integer :: ii,jj,kk
-    integer :: l,k,m
+    real(dp) :: rndr, ax, ay, aa(2)
+    real(dp) :: bb(2,2)
+    integer :: ii,jj
+    integer :: l,k
 
-    if (4*Nx*Ny*Nz .ne. Natoms) then
-       STOP 'Error: Nx*Ny*Nz != Natoms'
-    endif
+    
+    ax = Lx/Nx; ay = Ly/Ny
 
-    ax = Lx/Nx; ay = Ly/Ny; az = Lz/Nz
-    bb(:,1) = (/        ax/4.0_dp,        ay/4.0_dp, az/4.0_dp /)
-    bb(:,2) = (/ 3.0_dp*ax/4.0_dp, 3.0_dp*ay/4.0_dp, az/4.0_dp /)
-    bb(:,3) = (/ ax/4.0_dp, 3.0_dp*ay/4.0_dp, 3.0_dp*az/4.0_dp /)
-    bb(:,4) = (/ 3.0_dp*ax/4.0_dp, ay/4.0_dp, 3.0_dp*az/4.0_dp /)
+    bb(:,1) = (/        ax/4.0_dp,        ay/4.0_dp       /)
+    bb(:,2) = (/ 3.0_dp*ax/4.0_dp,  3.0_dp*ay/4.0_dp        /)
 
     i = 1
 
-    do m = 1, Nz
       do k = 1, Ny
          do l= 1, Nx
 
             aa(1) = (l-1)*Lx/Nx
             aa(2) = (k-1)*Ly/Ny
-            aa(3) = (m-1)*Lz/Nz
             ! Initialize positions in the box
             x(:,i) = aa(:) + bb(:,1)
-            call boxind(x(:,i),ii,jj,kk)
-            !write(*,'(3f16.6,3i5)') x(:,i),ii,jj,kk
-            call add(boxlists(ii,jj,kk),i)
+            call boxind(x(:,i),ii,jj)
+            !write(*,'(3f16.6,3i5)') x(:,i),ii,jj
+            call add(boxlists(ii,jj),i)
             i = i + 1
 
             x(:,i) = aa(:) + bb(:,2)
-            call boxind(x(:,i),ii,jj,kk)
-            !write(*,'(3f16.6,3i5)') x(:,i),ii,jj,kk
-            call add(boxlists(ii,jj,kk),i)
-            i = i + 1
-
-            x(:,i) = aa(:) + bb(:,3)
-            call boxind(x(:,i),ii,jj,kk)
-            !write(*,'(3f16.6,3i5)') x(:,i),ii,jj,kk
-            call add(boxlists(ii,jj,kk),i)
-            i = i + 1
-
-            x(:,i) = aa(:) + bb(:,4)
-            call boxind(x(:,i),ii,jj,kk)
-            !write(*,'(3f16.6,3i5)') x(:,i),ii,jj,kk
-            call add(boxlists(ii,jj,kk),i)
+            call boxind(x(:,i),ii,jj)
+            !write(*,'(3f16.6,3i5)') x(:,i),ii,jj
+            call add(boxlists(ii,jj),i)
             i = i + 1
 
          enddo
       enddo
-    enddo
 
   end subroutine init_positions_fcc
 
@@ -95,40 +100,64 @@ module simulations
       ! Initialize random MB velocities.
       v(1,i) = maxwell_boltzmann()
       v(2,i) = maxwell_boltzmann()
-      v(3,i) = maxwell_boltzmann()
     end do
 
   end subroutine init_velocities
     
 
   ! ---------------------------------------------------------
-  subroutine init_lyapunov()    
+  ! Init velocities for the couette BC
+subroutine init_velocities_couette()
 
-   integer :: i, j, k
+    integer :: i
+    real(dp) :: upperlayers, lowerlayers
 
-   do i=1,6*Natoms
-     do j=1,Natoms
-        do k=1,3
-           if (i.le.3*Natoms) then
-              if (i+j-k==4*j-3) then
-                 dx(k,j,i)=D0
-              else
-                 dx(k,j,i)=0.0_dp
-              end if
-              dv(k,j,i)=0.0_dp
-           else
-              if (i-3*Natoms+j-k==4*j-3) then
-                 dv(k,j,i)=D0
-              else
-                 dv(k,j,i)=0.0_dp
-              end if
-              dx(k,j,i)=0.0_dp
-           end if
-        end do
-      end do
-   end do
+    upperlayers = maxval(x(2,:)) - Ly/Ny !first two layers of the fluid
+    lowerlayers = minval(x(2,:)) + Ly/Ny
 
-  end subroutine init_lyapunov
+    do i = 1, Natoms
+
+       if(x(2,i) .ge. upperlayers) then
+          v(1,i) = v_drift
+          v(2,i) = 0.d0
+
+        elseif(x(2,i) .le. lowerlayers) then
+          v(1,i) = 0.d0
+          v(2,i) = 0.d0          
+
+       else
+          v(1,i) = maxwell_boltzmann()
+          v(2,i) = maxwell_boltzmann()
+       end if
+    end do
+    print*,'init velocities couette:'
+    print*,'vmax=',maxval(v(1,:)),maxval(v(2,:))
+    print*,'vmin=',minval(v(1,:)),minval(v(2,:))
+    print*,'done'
+
+  end subroutine init_velocities_couette
+
+   subroutine init_positions_file
+    real(dp) :: dummy
+    character(5) :: string
+    integer :: i, ii, jj
+    
+    print*,"Reading file "//trim(file_name)
+
+    open(100, file=trim(file_name))
+    read(100, *)
+    read(100, *)
+    do i=1,Natoms
+
+      read(100, * ) string, x(1,i), x(2,i), dummy, v(1,i), v(2,i), dummy
+      call boxind(x(:,i),ii,jj)
+      call add(boxlists(ii,jj),i)
+
+    end do
+    
+    
+   end subroutine init_positions_file
+
   
   ! ---------------------------------------------------------
   ! In ogni direzione P = (m/2PikT)^1/2 exp(-m v^2 / 2kT)
@@ -148,7 +177,7 @@ module simulations
     do
        call random_number(rndr)
 
-       vv = b*sqrt( - 2.0_dp * kb * Temp/Mass * log(rndr+eps) )
+       vv = b*sqrt( - kb * Temp/Mass * log(rndr+eps) )
        exit
     enddo
 
@@ -183,7 +212,6 @@ module simulations
     real(dp), dimension(:,:,:), allocatable :: etaf
 
     real(dp), dimension(:,:,:),allocatable :: dxf,dvf
-    real(dp), dimension(:,:), allocatable :: d_check
     real(dp), dimension(:,:),allocatable :: uu, vv
     real(dp), dimension(:,:,:),allocatable :: inf_v
     
@@ -191,7 +219,7 @@ module simulations
     real(dp), dimension(:),allocatable :: kine
     
     integer :: nstep1, nstep2, nstepgram, ng, err
-    integer :: n, iter, pq, i, j
+    integer :: n, iter, pq, i, j, kminus, kplus
     character(3) :: ind
 
     real(dp) :: U           ! Potential energy
@@ -199,19 +227,12 @@ module simulations
     real(dp) :: K0          ! kin ?
     real(dp) :: virial      ! virial = - Sum_i Sum_j (r_ij * F_ij)
     real(dp) :: P           ! Pressure (from virial)
-    real(dp) :: lambda      ! scaling parameter 
+    real(dp) :: lambda      ! scaling parameter
     real(dp) :: Kav,Uav,Pav ! Averaged quantities
-    real(dp) :: R(3),R0(3)  ! For diffusivity 
+    real(dp) :: R(2),R0(2)  ! For diffusivity 
     real(dp), allocatable :: dR(:)  ! For diffusivity 
-    real(dp) :: R2, R02, Diff, Rcm(3)
-    
-    real(dp),dimension(3) :: Jc_av     ! Current
-    real(dp) :: Sh
-    real(dp),dimension(:),allocatable :: Sh_list
-    real(dp),dimension(:,:),allocatable :: xv
-    real(dp) :: errD,Dl,lj1,Dfrac, jj, kk
-    integer :: kplus, kminus 
-    pq=0
+    real(dp) :: R2, R02, Diff, Rcm(2)
+  
     Pav = 0.0_dp
     Uav = 0.0_dp
     Kav = 0.0_dp
@@ -219,38 +240,33 @@ module simulations
     Diff= 0.0_dp 
     Rcm = 0.0_dp
     !Lennard-Jones time units:
-    LJTU = sqrt(Mass/eps)*sigma
-    print*,'LJ TIME UNITS:',LJTU
+    !LJTU = sqrt(Mass/eps)*sigma
+    !print*,'LJ TIME UNITS:',LJTU
 
     nstep1=nint(tinit/dt)
     nstep2=nint(tsim/dt)
     nstepgram = nint(tgram/dt)
-    ng = tsim/tgram
-
-    allocate(dR(3*Natoms),stat=err)
-    allocate(etaf(3,Natoms,5),stat=err)
-    
-    allocate(xf(3,Natoms),stat=err)
-    allocate(vf(3,Natoms),stat=err)
-
     if (do_lyapunov) then
-      allocate(dxf(3,Natoms,6*Natoms),stat=err)
-      allocate(dvf(3,Natoms,6*Natoms),stat=err)
+      ng = tsim/tgram
+      pq = 0
+      allocate(dxf(2,Natoms,4*Natoms),stat=err)
+      allocate(dvf(2,Natoms,4*Natoms),stat=err)
  
-      allocate(vv(6*Natoms,6*Natoms),stat=err)
-      allocate(uu(6*Natoms,6*Natoms),stat=err)
+      allocate(vv(4*Natoms,4*Natoms),stat=err)
+      allocate(uu(4*Natoms,4*Natoms),stat=err)
  
-      allocate(Lyapunov(6*Natoms),stat=err)
+      allocate(Lyapunov(4*Natoms),stat=err)
       Lyapunov = 0.0_dp
-      allocate(L_plus(6*Natoms),stat=err)
-      allocate(L_minus(6*Natoms),stat=err)
-
-      allocate(inf_v(6*Natoms,6*Natoms,ng),stat=err)
-    
-      allocate(d_check(6*Natoms, 6*Natoms))
+      allocate(L_plus(4*Natoms),stat=err)
+      allocate(L_minus(4*Natoms),stat=err)
+      allocate(inf_v(4*Natoms,4*Natoms,ng),stat=err)
     end if
 
+    allocate(dR(2*Natoms),stat=err)
+    allocate(xf(2,Natoms),stat=err)
+    allocate(vf(2,Natoms),stat=err)
     allocate(kine(nstep2),stat=err)
+    allocate(etaf, mold=eta)
     
     if (err /= 0) STOP 'ALLOCATION ERROR'
     
@@ -271,18 +287,20 @@ module simulations
     open(113,file='data/e_tot.dat')
     open(123,file='data/U.dat')
     open(133,file='data/P.dat')
+  
     
-    open(104,file='data/lyap_pl_200_2.dat')
-    open(106,file='data/lyap_mi_200_2.dat')
-    open(105,file='data/xv_x300.dat')
-    open(115,file='data/xv_y300.dat')
-    open(125,file='data/xv_z300.dat')
+    !open(104,file='data/lyap_pl_200_2.dat')
+    !open(106,file='data/lyap_mi_200_2.dat')
+    !open(105,file='data/xv_x300.dat')
+    !open(115,file='data/xv_y300.dat')
+    !open(125,file='data/xv_z300.dat')
 
     ! init time
     write(*,*) 'Warm up phase:',nstep1,'steps'
     ! Target mean Kinetic energy:
-    K0=(3.d0*Natoms*kb*Temp/2.d0)
+    K0=(Natoms*kb*Temp)
     write(*,*) 'Target T=',Temp,'K=',K0
+
 
     do n=1,nstep1
 
@@ -291,23 +309,20 @@ module simulations
           write(101,*) 'Frame',n
           call write_xyz(101)
        endif
+      !
+      call verlet(x,v,xf,vf,U,virial,dt,lj,K)
+      call sym4(x,v,xf,vf,U,virial,dt,lj,K)
+      call update_boxes(x,xf)
 
-       if (nose_hoover) then
-         call verlet_nh15(x,v,U,virial,dt,lj,const_field,K,K0,eta,etaf,xf,vf)
-       else  
-         call verlet(x,v,xf,vf,U,virial,dt,lj,const_field,K)
-       end if  
 
-       call update_boxes(x,xf)
-
-       P = (Natoms*kb*Temp + virial/3.d0)/Vol
+       !P = (Natoms*kb*Temp + virial/2.d0)/Area
 
        if (mod(n,print_interval) == 0) then
-         write(*,'(i6,a,i6,3x,4(a3,ES14.6,2x))') n,'/',nstep1,'Ek=',K,'U=',U,'E=',K+U,'P=',P
+         write(*,'(i8,a,i8,3x,4(a3,ES14.6,2x))') n,'/',nstep1,'Ek=',K,'U=',U,'E=',K+U
        end if
 
        if (scaling) then
-          lambda = sqrt((3.d0*Natoms*kb*Temp/2.d0)/K)
+          lambda = sqrt((Natoms*kb*Temp)/K)
           v = vf * lambda
        else 
           v = vf
@@ -334,15 +349,13 @@ module simulations
           call write_xyz(101)
        endif
        
-       if (nose_hoover) then
-         if (do_lyapunov) then     
-           call verlet_nh15_ly(x,v,U,virial,dt,lj_ly,const_field_ly,K,K0,eta,etaf,xf,vf,dx,dv,dxf,dvf)
-         else  
-           call verlet_nh15(x,v,U,virial,dt,lj,const_field,K,K0,eta,etaf,xf,vf)
-         end if  
-       else  
-         call verlet(x,v,xf,vf,U,virial,dt,lj,const_field,K)
-       end if  
+       if (do_lyapunov) then     
+          call verlet_ly(x,v,xf,vf,U,virial,dt,lj_ly,K,dx,dv,dxf,dvf)
+          !call sym4_ly(x,v,xf,vf,U,virial,dt,lj_ly,K,dx,dv,dxf,dvf) 
+       else   
+          call verlet(x,v,xf,vf,U,virial,dt,lj,K)
+          !call sym4(x,v,xf,vf,U,virial,dt,lj,K) 
+       end if   
        
        if (do_lyapunov) then
           ! Ly = sum_i log(|dx|)/tfin
@@ -365,10 +378,11 @@ module simulations
 
        call update_boxes(x,xf)
  
-       P = (Natoms*kb*Temp + virial/3.d0)/Vol
+       !P = (Natoms*kb*Temp + virial/2.d0)/Area
+      
 
        if (mod(n,print_interval) == 0) then
-         write(*,'(i6,a,i6,3x,4(a3,ES14.6,2x))') n,'/',nstep2,'Ek=',K,'U=',U,'E=',K+U,'P=',P
+         write(*,'(i8,a,i8,3x,4(a3,ES14.6,2x))') n,'/',nstep2,'Ek=',K,'U=',U,'E=',K+U
        end if 
        !write(103,*) n*dt, K
        !write(113,*) n*dt, U+K
@@ -376,10 +390,9 @@ module simulations
        !write(133,*) n*dt, P
        kine(n)=K
        Uav = Uav + U/nstep2
-       Jc_av = Jc_av + current(x,v)/nstep2
 
        if (scaling) then 
-          lambda = sqrt((3.d0*Natoms*kb*Temp/2.d0)/K)
+          lambda = sqrt((Natoms*kb*Temp)/K)
           v = vf * lambda
        else 
           v = vf
@@ -387,13 +400,23 @@ module simulations
 
        x = xf     
        eta=etaf
-       dx=dxf
-       dv=dvf
-    !print*,'dd: ------------------'
-    !d_check = newshape2(dx,dv)
-    !do i = 1, 6*Natoms
-    !  write(*,*) d_check(i,:)
-    !end do
+       if (do_lyapunov) then
+         dx=dxf
+         dv=dvf
+       end if
+
+      dR = dR + reshape(v ,(/ 2*Natoms /))
+      dR = dR + reshape(vf,(/ 2*Natoms /))
+      R2 = dot_product(dR,dR)*dt*dt/Natoms/4.0_dp
+      write(102,*) n*dt, R2
+
+      Pav = Pav + P/nstep2
+      Kav = Kav + K/nstep2
+      Uav = Uav + U/nstep2
+      R = x(:,Natoms/2) - R0
+      Rcm = Rcm + R/nstep2
+      R2 = dot_product(R,R)
+      Diff = Diff + R2/nstep2
    
     end do
 
@@ -411,7 +434,7 @@ module simulations
       end select      
 
       kplus=0; kminus=0;
-      do i=1,6*Natoms
+      do i=1,4*Natoms
         if (Lyapunov(i).gt.0) then
           kplus=kplus+1    
           L_plus(kplus)=Lyapunov(i)
@@ -421,26 +444,27 @@ module simulations
         end if   
       end do
   
-      do i=1,3*Natoms
-         write(104,*) i, L_plus(i)*LJTU
+      do i=1,2*Natoms
+         !write(104,*) i, L_plus(i)*LJTU
          write(*,'(a,i4,a,f10.5)') 'l(',i,')=',L_plus(i)*LJTU
+         write(*,'(a,i4,a,f10.5)') 'l(',i,')=',L_minus(i)*LJTU
       end do
 
       ! Kaplan-Yorke dimension
-      lj1=0.d0
-      jj=0.d0
-      do i=1,6*Natoms
-        if (lj1 .ge. 0.d0) then
-           lj1=lj1+lyapunov(i)
-           jj=0.d0+i
-        end if
-      end do
+      !lj1=0.d0
+      !jj=0.d0
+      !do i=1,6*Natoms
+      !  if (lj1 .ge. 0.d0) then
+      !     lj1=lj1+lyapunov(i)
+      !     jj=0.d0+i
+      !  end if
+      !end do
      
-      if (nint(jj) .eq. (6*Natoms)) then
-         Dfrac=(jj-6)
-      else
-         Dfrac=(jj-6)+lj1/abs(lyapunov(int(jj+1)))
-      end if
+      !if (nint(jj) .eq. (6*Natoms)) then
+      !   Dfrac=(jj-6)
+      !else
+      !   Dfrac=(jj-6)+lj1/abs(lyapunov(int(jj+1)))
+      !end if
     end if
 
     close(101)
@@ -454,7 +478,7 @@ module simulations
     close(115)
     close(125)
     close(106)
-
+   
 
 
     write(*,*)
@@ -473,19 +497,6 @@ module simulations
 !!$    write(*,*) 'Diffusivity=',Diff/dt,'nm^2/fs'
 !!$    !write(*,*) ' K0=' K0
     if (do_lyapunov) then 
-       if (Fe .ne. 0.d0) then
-          kk=Jc_av(1)/(Fe*Lx*Ly*Lz)
-          Dl=-LJTU*(Lx**3)*(3*(Natoms-1)+1)*kk*(Fe**2)/(2*K0)
-          ErrD=-LJTU*(Lx**3)*(3*(Natoms-1)+1)*kk*(Fe**2)/(2*(K0-( (sum((kine-(sum(kine)/nstep2))**2))/nstep2)))
-       else
-          Dl=0.0
-          ErrD=0.d0
-       end if
-    
-      write(*,*) 'Delta=',Dl 
-      write(*,*) 'Err Delta+-', abs(Dl-ErrD)
-      write(*,*) 'Dfrac=', Dfrac
-
       deallocate(Lyapunov,L_plus,L_minus)
       deallocate(dxf,dvf,uu,vv)
     end if  
@@ -499,23 +510,6 @@ module simulations
 
   end subroutine nve_sim
 
-  function current(x,v) result(J)
-    real(dp), intent(in) :: x(:,:)
-    real(dp), intent(in) :: v(:,:)
-    real(dp) :: J(3)
-   
-    integer :: n
-
-    J = 0.0_dp
-    do n = 1, Natoms
-      if (x(3,n) < Lz/2.0_dp) then
-         J = J - v(:,n)  
-      else
-         J = J + v(:,n)  
-      end if
-    end do
-
-  end function current
 
   function kinetic() result(Ek)
      real(dp) :: Ek
@@ -523,20 +517,21 @@ module simulations
      
      Ek =0.0_dp
      do n = 1, Natoms
-        Ek = Ek + dot_product(v(:,n),v(:,n))   
+        Ek = Ek + dot_product(v(:,n),v(:,n))
      end do
      Ek = Ek*Mass*0.5_dp 
 
   end function kinetic
 
+  
   subroutine write_xyz(id)
     integer :: id
 
-    integer :: n, ii, jj, kk
+    integer :: n, ii, jj
  
     do n = 1, Natoms      
-       !call boxind(x(:,n),ii,jj,kk)
-       write(id,'(a,3(f12.6),3(ES20.8))') 'He  ', x(:,n)*10.0_dp  !,v(:,n)
+       !call boxind(x(:,n),ii,jj)
+      write(id,'(a,4(f12.6),3(ES20.8))') 'He  ', x(:,n), 0.0_dp ,v(:,n), 0.0_dp
     enddo
 
   end subroutine write_xyz
@@ -546,7 +541,7 @@ module simulations
 
     integer :: n
  
-    write(id,'(1X,L2,I7,3E23.15)') .true.,Natoms,Lx/sigma,Ly/sigma,Lz/sigma
+    write(id,'(1X,L2,I7,3E23.15)') .true.,Natoms,Lx/sigma,Ly/sigma
     do n = 1, Natoms      
        write(id,'(1X,3E23.15)') x(:,n)/sigma
     enddo
@@ -559,11 +554,50 @@ module simulations
 
   end subroutine write_coords
 
+  ! ---------------------------------------------------------
+  subroutine init_lyapunov()    
 
+    integer :: i, j, k
+
+    call create_xvly()
+
+    ! dx(2*Natoms,4*Natoms) -> dx(l,m)  = delta(l,m)
+    ! (1 0 0 0 . . .  )
+    ! (0 1 0 0 . . .  )
+    ! (0 0 1 0 .....  )
+    !
+    ! Mapping to dx(k,j,i) into dx(l,m):
+    !   l=2(j-1)+k, m=i
+    !   
+    !  2j-2 + k == i ==>  3*j-2 == i + j - k
+
+    dx = 0.0_dp
+    dv = 0.0_dp
+
+    do i = 1, 4*Natoms
+      do j = 1, Natoms
+         do k = 1, 2
+            if (i.le.2*Natoms) then
+               ! 4*j-3    
+               if (i+j-k == 3*j-2) then
+                  dx(k,j,i)=D0
+               end if
+            else
+               if (i+j-k-2*Natoms == 3*j-2) then
+                  dv(k,j,i)=D0
+               end if
+            end if
+         end do
+       end do
+    end do
+ 
+   end subroutine init_lyapunov
+   
+   ! ---------------------------------------------------------
   
   subroutine compute_g()
-    real(dp) :: rij(3), g(3), r, a, b 
-    integer :: ii, jj, kk, ci, cj, ck, u,v,w
+    real(dp) :: rij(2), g(2), r, a, b 
+    integer :: ii, jj, ci, cj, u,v
     integer :: m, l
     type(TNode), pointer :: it  
      
@@ -579,20 +613,18 @@ module simulations
     do m = 1, Natoms
 
        ! cerca la scatola ci,cj,ck di i
-       call boxind(x(:,m),ci,cj,ck)          
-       
-       do w=-1,1
+       call boxind(x(:,m),ci,cj)          
+    
          do v=-1,1 
            do u=-1,1
               ii = ci + u
-              jj = cj + v     
-              kk = ck + w  
+              jj = cj + v
                     
               ! g e' vettore supercella
-              call folding(ii,jj,kk,g)
+              call folding(ii,jj,g)
 
-              ! Iterates over atoms in box (ii,jj,kk)
-              it => boxlists(ii,jj,kk)%start
+              ! Iterates over atoms in box (ii,jj)
+              it => boxlists(ii,jj)%start
          
               do while (associated(it))     
              
@@ -614,12 +646,12 @@ module simulations
                   endif
 
                   it => it%next
-
+                
               end do
 
             enddo
           enddo
-        enddo
+
 
      end do
       
@@ -627,7 +659,7 @@ module simulations
      open(101,file='data/g.dat')
      do m = 1, Nk
         r = m*dr
-        write(101,*) r, gg(m)*Vol/(4.d0*Natoms*Natoms*Pi*r*r*dr)  
+        write(101,*) r, gg(m)*Area/(2.d0*Natoms*Natoms*Pi*r*r*dr) 
      enddo
  
      close(101)

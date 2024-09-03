@@ -1,17 +1,25 @@
-4000    ! Natoms
-5.405    ! Lx      [nm] 
-5.405   ! Ly      [nm] 
-5.405    ! Lz      [nm] 
-10 10 10
-1.35    ! Rc      [nm] 
-@TT    ! Temp    [K]
-39.948 ! Mass    [AMU]
-0.0103 ! epsilon [eV]
-0.3405 ! sigma   [nm] 
-20000  ! tinit   [fs]
-10000  ! tsim    [fs]
-10     ! dt      [fs]
-.true. ! velocity scaling
-0.01   ! dr
-.false. ! write xyz file
-100    ! write interval
+Natoms=2
+Lx=9.0       ! [nm] 
+Ly=9.0       ! [nm] 
+Nx=10         ! numero di celle fcc in x
+Ny=10         ! numero di celle fcc in y
+Tinit=10.0     ![fs]
+Tsim=10000.0   ![fs]
+Rc=3.0        ! [nm]
+Temp=0.0      ! [K]
+Mass=1.000    ![AMU]
+Eps=1.00      ![eV]
+Sigma=1.00    ![nm] 
+dt=0.005        ![]
+Nose_Hoover=.false.
+NH_Mass=5d0    
+dr=0.01   
+Scaling= .false. 
+Print_xyz=.true.
+file_name=''
+Print_interval=10
+Lyapunov=.true.
+LyapunovAlgo=qr
+Tortho=50  
+
+

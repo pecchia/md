@@ -12,8 +12,8 @@ contains
 
   subroutine lyap_numbers(a,c,n)
     integer, intent(in) :: n 
-    real(dp),dimension(6*Natoms,6*Natoms,n),intent(in):: a
-    real(dp),dimension(6*Natoms),intent(out):: c
+    real(dp),dimension(4*Natoms,4*Natoms,n),intent(in):: a
+    real(dp),dimension(4*Natoms),intent(out):: c
   
     integer:: i,j,pq,h,l
     integer:: err
@@ -21,11 +21,11 @@ contains
     real(dp),dimension(:,:),allocatable :: Vol,Vol1,lh
     real(dp),dimension(:),allocatable:: lyapsommati
     
-    allocate(G(6*Natoms,6*Natoms,n),stat=err)
-    allocate(Vol(6*Natoms,n),stat=err)
-    allocate(Vol1(6*Natoms,n),stat=err)
-    allocate(lh(6*Natoms,n),stat=err)
-    allocate(lyapsommati(6*Natoms),stat=err)
+    allocate(G(4*Natoms,4*Natoms,n),stat=err)
+    allocate(Vol(4*Natoms,n),stat=err)
+    allocate(Vol1(4*Natoms,n),stat=err)
+    allocate(lh(4*Natoms,n),stat=err)
+    allocate(lyapsommati(4*Natoms),stat=err)
     if (err /= 0) STOP 'ALLOCATION ERROR'
     
     G=0.d0
@@ -46,7 +46,7 @@ contains
     do pq=1,n
       write(*,*) pq,n
        
-      do i=1,6*Natoms
+      do i=1,4*Natoms
         if (i==1) then
           Vol(i,pq)=sqrt(dot_product(a(:,i,pq),a(:,i,pq)))
         else
@@ -80,17 +80,17 @@ contains
       end do
     end do
     
-    do i=1,6*Natoms
+    do i=1,4*Natoms
        write(705,*) vol(i,10)
     end do
-    do i=1,6*Natoms
+    do i=1,4*Natoms
        write(706,*) vol(i,100)
     end do
-    do i=1,6*Natoms
+    do i=1,4*Natoms
        write(707,*) vol(i,500)
     end do
 
-    do i=1,6*Natoms
+    do i=1,4*Natoms
       Vol1(i,:)=log(Vol(i,:))
       if (i==1) then
          lh(i,:) = vol1(i,:) 
@@ -112,7 +112,7 @@ contains
     close(706)
     close(707)
 
-    do i=1,6*Natoms
+    do i=1,4*Natoms
        lyapsommati(i)=sum(Vol1(i,:))/(tsim)
     end do
 
@@ -130,15 +130,15 @@ contains
 
   subroutine lyap_numbers2(a,c,n)
     integer, intent(in) :: n
-    real(dp),dimension(6*Natoms,6*Natoms,n),intent(in):: a
-    real(dp),dimension(6*Natoms),intent(out):: c
+    real(dp),dimension(4*Natoms,4*Natoms,n),intent(in):: a
+    real(dp),dimension(4*Natoms),intent(out):: c
   
     integer :: i,pq 
     integer:: err
     real(dp),dimension(:,:),allocatable :: leng
     
    
-    allocate(leng(6*Natoms,n),stat=err)
+    allocate(leng(4*Natoms,n),stat=err)
 
     if (err /= 0) STOP 'ALLOCATION ERROR'
 
@@ -146,12 +146,12 @@ contains
     c=0.d0
 
     do pq = 1, n
-      do i = 1, 6*Natoms
+      do i = 1, 4*Natoms
          leng(i,pq) =log(sqrt(dot_product(a(:,i,pq),a(:,i,pq))))
       end do
     end do
 
-    do i=1,6*Natoms
+    do i=1,4*Natoms
       c(i) = sum(leng(i,:))/tsim
     end do
   
@@ -159,7 +159,7 @@ contains
 
   ! ---------------------------------------------------------
   subroutine write_lyap(Lyapunov,Lp,Lm)
-    real(dp),dimension(6*Natoms)::Lyapunov
+    real(dp),dimension(4*Natoms)::Lyapunov
     real(dp),dimension(Lp):: L_plus
     real(dp),dimension(Lm):: L_minus
     integer :: i,Lp,Lm
@@ -169,7 +169,7 @@ contains
   
     Lp=0
     Lm=0
-    do i=1,6*Natoms
+    do i=1,4*Natoms
        if (Lyapunov(i) .ge.0) then
           Lp=Lp+1
           L_plus(Lp)=Lyapunov(i)
@@ -198,7 +198,7 @@ contains
    ! ---------------------------------------------------------
    function GRAMmatrix(Vectors,n,pq) result(f)
   
-     real(dp),dimension(6*natoms,n) :: Vectors
+     real(dp),dimension(4*natoms,n) :: Vectors
      real(dp),dimension(n,n) :: G_matrix
      real(dp)::f
      integer,intent(in) :: n

@@ -53,16 +53,10 @@ module input
        read(val,*) Lx
     else if (to_lower(trim(token))=="ly") then
        read(val,*) Ly
-    else if (to_lower(trim(token))=="lz") then
-       read(val,*) Lz
     else if (to_lower(trim(token))=="nx") then
        read(val,*) Nx
     else if (to_lower(trim(token))=="ny") then
        read(val,*) Ny
-    else if (to_lower(trim(token))=="nz") then
-       read(val,*) Nz
-    else if (to_lower(trim(token))=="rc") then
-       read(val,*) Rc
     else if (to_lower(trim(token))=="rc") then
        read(val,*) Rc
    else if (to_lower(trim(token))=="temp") then
@@ -87,6 +81,8 @@ module input
        read(val,*) print_xyz
     else if (to_lower(trim(token))=="print_interval") then
        read(val,*) print_interval 
+    else if (to_lower(trim(token))=="file_name") then
+       read(val, *) file_name
     else if (to_lower(trim(token))=="nh_mass") then
        read(val,*) Q
     else if (to_lower(trim(token))=="dr") then
